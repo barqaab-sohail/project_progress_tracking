@@ -9,6 +9,8 @@ class BuildingProgressAggregated extends Model
 {
     use HasFactory;
 
+    protected $table = 'building_progress_aggregated';
+
     protected $fillable = [
         'building_id',
         'progress_date',

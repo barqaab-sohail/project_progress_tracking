@@ -62,9 +62,15 @@ class Building extends Model
         );
     }
 
+    // public function aggregatedProgress()
+    // {
+    //     return $this->hasMany(BuildingProgressAggregated::class);
+    // }
+
     public function aggregatedProgress()
     {
-        return $this->hasMany(BuildingProgressAggregated::class);
+        return $this->hasMany('App\Models\BuildingProgressAggregated')
+                    ->orderBy('progress_date');
     }
 
     // Scopes

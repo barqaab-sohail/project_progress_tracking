@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\Building;
 use App\Models\BuildingActivity;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
@@ -10,126 +9,92 @@ use Illuminate\Support\Facades\DB;
 
 class BuildingActualProgressSeeder extends Seeder
 {
-    private $chunkSize = 200; // Process buildings in smaller chunks
+    private $chunkSize = 500; // Process building activities in chunks
     private $batchSize = 1000; // Insert records in batches
-    private $maxMonths = 3; // Data for last 3 months only
-    private $targetProgressRange = [15, 20]; // 15-20% total progress
+    private $minWeeks = 3;    // Minimum weeks of progress to generate
+    private $maxWeeks = 6;    // Maximum weeks of progress to generate
+    private $startDate;       // Project start date
+
+    public function __construct()
+    {
+        $this->startDate = Carbon::now()->subMonths(6); // Project started 6 months ago
+    }
 
     public function run()
     {
-        $endDate = Carbon::now();
-        $startDate = Carbon::now()->subMonths($this->maxMonths)->startOfWeek();
+        $totalActivities = BuildingActivity::count();
 
-        Building::chunk($this->chunkSize, function ($buildings) use ($startDate, $endDate) {
-            $allProgressData = [];
+        // Process in chunks for memory efficiency
+        for ($offset = 0; $offset < $totalActivities; $offset += $this->chunkSize) {
+            $buildingActivities = BuildingActivity::with(['building', 'activity'])
+                ->skip($offset)
+                ->take($this->chunkSize)
+                ->get();
 
-            foreach ($buildings as $building) {
-                $buildingActivities = BuildingActivity::where('building_id', $building->id)
-                    ->with('activity')
-                    ->get();
-
-                // Determine building's actual progress percentage (15-20%)
-                $buildingTotalProgress = rand(
-                    $this->targetProgressRange[0] * 100,
-                    $this->targetProgressRange[1] * 100
-                ) / 100;
-
-                foreach ($buildingActivities as $buildingActivity) {
-                    $progressData = $this->generateActivityProgress(
-                        $building,
-                        $buildingActivity,
-                        $startDate,
-                        $endDate,
-                        $buildingTotalProgress
-                    );
-                    $allProgressData = array_merge($allProgressData, $progressData);
-
-                    // Insert in batches
-                    if (count($allProgressData) >= $this->batchSize) {
-                        $this->insertBatch($allProgressData);
-                        $allProgressData = [];
-                    }
-                }
-            }
-
-            // Insert remaining records
-            if (!empty($allProgressData)) {
-                $this->insertBatch($allProgressData);
-            }
-        });
+            $this->processActivities($buildingActivities);
+        }
     }
 
-    protected function generateActivityProgress($building, $buildingActivity, $startDate, $endDate, $buildingTotalProgress)
+    protected function processActivities($buildingActivities)
     {
-        $progressData = [];
-        $weightage = $buildingActivity->weightage;
+        $allProgressData = [];
 
-        // Calculate target progress for this activity
-        $activityTargetProgress = ($weightage / 100) * $buildingTotalProgress;
+        foreach ($buildingActivities as $buildingActivity) {
+            $weeks = rand($this->minWeeks, $this->maxWeeks);
+            $totalWeightage = $buildingActivity->weightage;
+            $weeklyIncrement = $totalWeightage / ($weeks + 1); // +1 to prevent 100% completion
 
-        // Get scheduled progress dates for this activity
-        $scheduledWeeks = DB::table('building_schedule_progress')
-            ->where('building_id', $building->id)
-            ->where('activity_id', $buildingActivity->activity_id)
-            ->whereBetween('progress_date', [$startDate, $endDate])
-            ->orderBy('progress_date')
-            ->pluck('progress_date')
-            ->unique();
-
-        if ($scheduledWeeks->isEmpty()) {
-            // If no scheduled weeks, create some realistic progress
-            $weeksCount = min(12, rand(4, 12)); // 4-12 weeks of progress
-            $progressPerWeek = $activityTargetProgress / $weeksCount;
-
-            $currentDate = $startDate->copy();
+            // Random start date within project duration (last 6 months)
+            $currentDate = $this->startDate->copy()->addDays(rand(0, 180));
             $currentProgress = 0;
 
-            for ($week = 1; $week <= $weeksCount; $week++) {
-                $progress = ($week === $weeksCount)
-                    ? $activityTargetProgress
-                    : min($currentProgress + $progressPerWeek, $activityTargetProgress);
+            for ($week = 1; $week <= $weeks; $week++) {
+                $currentProgress = min($currentProgress + $weeklyIncrement, $totalWeightage * 0.95); // Cap at 95%
 
-                $progressData[] = [
-                    'building_id' => $building->id,
+                $allProgressData[] = [
+                    'building_id' => $buildingActivity->building_id,
                     'activity_id' => $buildingActivity->activity_id,
-                    'progress_percentage' => $progress,
+                    'progress_percentage' => $currentProgress,
                     'progress_date' => $currentDate->format('Y-m-d'),
+                    'notes' => $this->generateProgressNote($week, $weeks, $currentProgress, $totalWeightage),
                     'created_at' => now(),
                     'updated_at' => now(),
                     'created_by' => 1,
                     'updated_by' => 1,
                 ];
 
-                $currentProgress = $progress;
                 $currentDate->addWeek();
-            }
-        } else {
-            // Follow scheduled weeks but with actual progress
-            $weeksCount = $scheduledWeeks->count();
-            $progressPerWeek = $activityTargetProgress / $weeksCount;
-            $currentProgress = 0;
 
-            foreach ($scheduledWeeks as $weekDate) {
-                $progress = ($weekDate === $scheduledWeeks->last())
-                    ? $activityTargetProgress
-                    : min($currentProgress + $progressPerWeek, $activityTargetProgress);
-
-                $progressData[] = [
-                    'building_id' => $building->id,
-                    'activity_id' => $buildingActivity->activity_id,
-                    'progress_percentage' => $progress,
-                    'progress_date' => $weekDate,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                    'created_by' => 1,
-                    'updated_by' => 1,
-                ];
-
-                $currentProgress = $progress;
+                // Insert in batches
+                if (count($allProgressData) >= $this->batchSize) {
+                    $this->insertBatch($allProgressData);
+                    $allProgressData = [];
+                }
             }
         }
 
-        return $progressData;
+        // Insert remaining records
+        if (!empty($allProgressData)) {
+            $this->insertBatch($allProgressData);
+        }
+    }
+
+    protected function generateProgressNote($currentWeek, $totalWeeks, $currentProgress, $totalWeightage)
+    {
+        $phrases = [
+            "Week {$currentWeek} progress: {$currentProgress}% of {$totalWeightage} weightage",
+            "Phase {$currentWeek} completed",
+            "Achieved {$currentProgress}% progress this week",
+            "Construction update: {$currentProgress}% done",
+            "Work ongoing - {$currentProgress}% complete",
+            "Quality inspection passed for this phase",
+            "Materials installed for this stage",
+            "Crew completed weekly targets",
+            "Partial completion recorded",
+            "Progress meeting notes updated"
+        ];
+
+        return $phrases[array_rand($phrases)];
     }
 
     protected function insertBatch($data)

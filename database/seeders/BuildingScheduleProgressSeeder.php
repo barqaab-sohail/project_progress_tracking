@@ -12,10 +12,10 @@ class BuildingScheduleProgressSeeder extends Seeder
 {
     private $chunkSize = 500; // Process buildings in chunks
     private $batchSize = 1000; // Insert records in batches
+    private $projectDurationMonths = 12; // Total project duration in months
 
     public function run()
     {
-        $startDate = Carbon::now()->startOfWeek();
         $totalBuildings = Building::count();
 
         // Process in chunks for memory efficiency
@@ -24,71 +24,53 @@ class BuildingScheduleProgressSeeder extends Seeder
                 ->take($this->chunkSize)
                 ->get();
 
-            $this->processBuildings($buildings, $startDate);
+            $this->processBuildings($buildings);
         }
     }
 
-    protected function processBuildings($buildings, $startDate)
+    protected function processBuildings($buildings)
     {
-        $allProgressData = [];
+        $allScheduleData = [];
 
         foreach ($buildings as $building) {
             $buildingActivities = BuildingActivity::where('building_id', $building->id)
                 ->with('activity')
+                ->orderBy('sort_order') // Ensure activities are processed in order
                 ->get();
 
+            $totalActivities = count($buildingActivities);
+            $currentActivity = 0;
+
             foreach ($buildingActivities as $buildingActivity) {
-                $progressData = $this->generateActivityProgress(
-                    $building,
-                    $buildingActivity,
-                    $startDate
-                );
-                $allProgressData = array_merge($allProgressData, $progressData);
+                $currentActivity++;
+                // Distribute activities evenly over the 12-month period
+                $monthsToAdd = (int) round(($this->projectDurationMonths * $currentActivity) / $totalActivities);
+                $completionDate = Carbon::now()->addMonths($monthsToAdd);
+
+                $scheduleData = [
+                    'building_id' => $building->id,
+                    'activity_id' => $buildingActivity->activity_id,
+                    'schedule_completion_date' => $completionDate->format('Y-m-d'),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                    'created_by' => 1,
+                    'updated_by' => 1,
+                ];
+
+                $allScheduleData[] = $scheduleData;
 
                 // Insert in batches
-                if (count($allProgressData) >= $this->batchSize) {
-                    $this->insertBatch($allProgressData);
-                    $allProgressData = [];
+                if (count($allScheduleData) >= $this->batchSize) {
+                    $this->insertBatch($allScheduleData);
+                    $allScheduleData = [];
                 }
             }
         }
 
         // Insert remaining records
-        if (!empty($allProgressData)) {
-            $this->insertBatch($allProgressData);
+        if (!empty($allScheduleData)) {
+            $this->insertBatch($allScheduleData);
         }
-    }
-
-    protected function generateActivityProgress($building, $buildingActivity, $startDate)
-    {
-        $progressData = [];
-        $weightage = $buildingActivity->weightage;
-        $activityDurationWeeks = rand(4, 52);
-        $progressIncrement = $weightage / $activityDurationWeeks;
-        $currentProgress = 0;
-        $currentDate = $startDate->copy();
-
-        for ($week = 1; $week <= $activityDurationWeeks; $week++) {
-            $progress = ($week === $activityDurationWeeks)
-                ? $weightage
-                : min($currentProgress + $progressIncrement, $weightage);
-
-            $progressData[] = [
-                'building_id' => $building->id,
-                'activity_id' => $buildingActivity->activity_id,
-                'progress_percentage' => $progress,
-                'progress_date' => $currentDate->format('Y-m-d'),
-                'created_at' => now(),
-                'updated_at' => now(),
-                'created_by' => 1,
-                'updated_by' => 1,
-            ];
-
-            $currentProgress = $progress;
-            $currentDate->addWeek();
-        }
-
-        return $progressData;
     }
 
     protected function insertBatch($data)

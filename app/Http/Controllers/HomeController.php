@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\Building;
 
 use Illuminate\Routing\Controller;
 
@@ -25,6 +26,13 @@ class HomeController extends Controller
      */
     public function index()
     {
-        return view('home');
+        // Load buildings with their latest aggregated progress data
+        $buildings = Building::with(['aggregatedProgress' => function($query) {
+            $query->latest('progress_date');
+        }])
+        ->orderBy('name')
+        ->get();
+
+        return view('home', compact('buildings'));
     }
 }
