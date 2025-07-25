@@ -29,6 +29,18 @@ class Building extends Model
         'latitude' => 'float'
     ];
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            $model->created_by = auth()->id();
+        });
+
+        static::updating(function ($model) {
+            $model->updated_by = auth()->id();
+        });
+    }
     // Relationships
     public function activities()
     {
@@ -70,7 +82,7 @@ class Building extends Model
     public function aggregatedProgress()
     {
         return $this->hasMany('App\Models\BuildingProgressAggregated')
-                    ->orderBy('progress_date');
+            ->orderBy('progress_date');
     }
 
     // Scopes

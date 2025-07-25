@@ -19,6 +19,20 @@ class Activity extends Model
         'updated_by'
     ];
 
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            $model->created_by = auth()->id();
+        });
+
+        static::updating(function ($model) {
+            $model->updated_by = auth()->id();
+        });
+    }
+
     protected $casts = [
         'is_active' => 'boolean'
     ];
