@@ -24,6 +24,19 @@ class BuildingActivity extends Model
         'is_active' => 'boolean'
     ];
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            $model->created_by = auth()->id();
+        });
+
+        static::updating(function ($model) {
+            $model->updated_by = auth()->id();
+        });
+    }
+
     // Relationships
     public function building()
     {

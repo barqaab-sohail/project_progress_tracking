@@ -2,18 +2,20 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class BuildingScheduleProgress extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'building_id',
         'activity_id',
         'progress_percentage',
-        'progress_date',
+        'schedule_start_date',
+        'schedule_completion_date',
         'notes',
         'created_by',
         'updated_by'
@@ -21,13 +23,32 @@ class BuildingScheduleProgress extends Model
 
     protected $casts = [
         'progress_percentage' => 'float',
-        'progress_date' => 'date'
+        'schedule_start_date' => 'date',
+        'schedule_completion_date' => 'date'
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            $model->created_by = auth()->id();
+        });
+
+        static::updating(function ($model) {
+            $model->updated_by = auth()->id();
+        });
+    }
 
     // Relationships
     public function building()
     {
         return $this->belongsTo(Building::class);
+    }
+
+    public function buildings()
+    {
+        return $this->hasMany(Building::class, 'id', 'building_id');
     }
 
     public function activity()
@@ -39,6 +60,11 @@ class BuildingScheduleProgress extends Model
     {
         return $this->belongsTo(BuildingActivity::class, 'activity_id', 'activity_id')
             ->where('building_id', $this->building_id);
+    }
+
+    public function buildingActivities()
+    {
+        return $this->hasMany(BuildingActivity::class, 'building_id', 'building_id');
     }
 
     public function creator()

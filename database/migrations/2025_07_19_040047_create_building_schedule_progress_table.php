@@ -15,10 +15,12 @@ return new class extends Migration
             $table->id();
             $table->foreignId('building_id')->constrained()->cascadeOnDelete();
             $table->foreignId('activity_id')->constrained()->cascadeOnDelete();
+            $table->date('schedule_start_date');
             $table->date('schedule_completion_date'); // Replaces progress_percentage and progress_date
             $table->text('notes')->nullable();
             $table->timestamps();
-            $table->foreignId('created_by')->constrained('users');
+            $table->softDeletes();
+            $table->foreignId('created_by')->nullable()->constrained('users');
             $table->foreignId('updated_by')->nullable()->constrained('users');
 
             $table->unique(['building_id', 'activity_id']); // Changed to unique as each activity should have only one scheduled date
