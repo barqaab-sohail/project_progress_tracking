@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('photo_path');
             $table->string('caption')->nullable();
             $table->timestamps();
-            $table->foreignId('created_by')->constrained('users');
+            $table->foreignId('created_by')->nullable()->constrained('users');
         });
     }
 

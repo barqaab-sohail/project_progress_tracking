@@ -19,7 +19,8 @@ return new class extends Migration
             $table->date('progress_date');
             $table->text('notes')->nullable();
             $table->timestamps();
-            $table->foreignId('created_by')->constrained('users');
+            $table->softDeletes();
+            $table->foreignId('created_by')->nullable()->constrained('users');
             $table->foreignId('updated_by')->nullable()->constrained('users');
 
             $table->index(['building_id', 'activity_id']);

@@ -28,7 +28,8 @@ class BuildingResource extends Resource
     {
         return $form
             ->schema([
-                TextInput::make('building_no')->required()->rules(['required']),
+                TextInput::make('building_no')->required()->unique(table: 'buildings', column: 'building_no', ignoreRecord: true)
+                    ->label('Building No'),
                 TextInput::make('name')->required()->rules(['required']),
                 Select::make('type')
                     ->options([
