@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Activity extends Model
 {
@@ -70,5 +71,32 @@ class Activity extends Model
         return $this->buildingActivities()
             ->where('building_id', $buildingId)
             ->sum('weightage');
+    }
+
+    public function getScheduledProgress(Carbon $date)
+    {
+        $schedule = $this->scheduleProgress;
+        if (!$schedule) return 0;
+
+        $start = Carbon::parse($schedule->schedule_start_date);
+        $end = Carbon::parse($schedule->schedule_completion_date);
+
+        if ($date <= $start) return 0;
+        if ($date >= $end) return 100;
+
+        $totalDays = $start->diffInDays($end);
+        $elapsedDays = $start->diffInDays($date);
+
+        return min(100, ($elapsedDays / $totalDays) * 100);
+    }
+
+    public function getActualProgress(Carbon $date)
+    {
+        $latestProgress = $this->actualProgress()
+            ->whereDate('progress_date', '<=', $date)
+            ->orderBy('progress_date', 'desc')
+            ->first();
+
+        return $latestProgress ? $latestProgress->progress_percentage : 0;
     }
 }

@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Building extends Model
 {
@@ -120,5 +121,32 @@ class Building extends Model
 
         // This would be called from the observer we created earlier
         // Implementation would be similar to the observer's updateAggregatedData method
+    }
+
+    public function getScheduledProgress(Carbon $date)
+    {
+        $totalActivities = $this->activities()->count();
+        if ($totalActivities === 0) return 0;
+
+        $completedActivities = $this->scheduleProgress()
+            ->where('schedule_completion_date', '<=', $date)
+            ->count();
+
+        return ($completedActivities / $totalActivities) * 100;
+    }
+
+    public function getActualProgress(Carbon $date)
+    {
+        $totalWeightage = $this->activities()->sum('weightage');
+        if ($totalWeightage === 0) return 0;
+
+        $completedWeightage = $this->activities()
+            ->whereHas('actualProgress', function ($q) use ($date) {
+                $q->where('progress_percentage', '>=', 100)
+                    ->where('progress_date', '<=', $date);
+            })
+            ->sum('weightage');
+
+        return ($completedWeightage / $totalWeightage) * 100;
     }
 }
