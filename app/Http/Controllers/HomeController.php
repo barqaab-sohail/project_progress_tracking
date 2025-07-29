@@ -27,11 +27,8 @@ class HomeController extends Controller
     public function index()
     {
         // Load buildings with their latest aggregated progress data
-        $buildings = Building::with(['aggregatedProgress' => function($query) {
-            $query->latest('progress_date');
-        }])
-        ->orderBy('name')
-        ->get();
+        $buildings = Building::orderBy('name')
+            ->get();
 
         return view('home', compact('buildings'));
     }

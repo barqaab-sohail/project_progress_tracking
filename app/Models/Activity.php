@@ -46,14 +46,13 @@ class Activity extends Model
 
     public function scheduleProgress()
     {
-        return $this->hasMany(BuildingScheduleProgress::class);
+        return $this->hasMany(BuildingScheduleProgress::class, 'activity_id');
     }
 
     public function actualProgress()
     {
-        return $this->hasMany(BuildingActualProgress::class);
+        return $this->hasMany(BuildingActualProgress::class, 'activity_id');
     }
-
     // Scopes
     public function scopeActive($query)
     {
@@ -66,37 +65,15 @@ class Activity extends Model
     }
 
     // Functions
-    public function getTotalWeightage($buildingId)
+
+
+    public function buildingScheduleProgress()
     {
-        return $this->buildingActivities()
-            ->where('building_id', $buildingId)
-            ->sum('weightage');
+        return $this->hasMany(BuildingScheduleProgress::class, 'activity_id');
     }
 
-    public function getScheduledProgress(Carbon $date)
+    public function buildingActualProgress()
     {
-        $schedule = $this->scheduleProgress;
-        if (!$schedule) return 0;
-
-        $start = Carbon::parse($schedule->schedule_start_date);
-        $end = Carbon::parse($schedule->schedule_completion_date);
-
-        if ($date <= $start) return 0;
-        if ($date >= $end) return 100;
-
-        $totalDays = $start->diffInDays($end);
-        $elapsedDays = $start->diffInDays($date);
-
-        return min(100, ($elapsedDays / $totalDays) * 100);
-    }
-
-    public function getActualProgress(Carbon $date)
-    {
-        $latestProgress = $this->actualProgress()
-            ->whereDate('progress_date', '<=', $date)
-            ->orderBy('progress_date', 'desc')
-            ->first();
-
-        return $latestProgress ? $latestProgress->progress_percentage : 0;
+        return $this->hasMany(BuildingActualProgress::class, 'activity_id');
     }
 }

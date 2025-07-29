@@ -35,10 +35,6 @@ class BuildingProgressAggregated extends Model
     ];
 
     // Relationships
-    public function building()
-    {
-        return $this->belongsTo(Building::class);
-    }
 
     // Scopes
     public function scopeByBuilding($query, $buildingId)
